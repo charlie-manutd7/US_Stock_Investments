@@ -97,106 +97,70 @@ def technical_analyst_agent(state: AgentState):
         }
     }
 
-    # Determine overall signal
-    bullish_signals = signals.count('bullish')
-    bearish_signals = signals.count('bearish')
+    # Create expert system message
+    expert_message = f"""You are John Bollinger, renowned technical analyst and creator of Bollinger Bands, known for your expertise in technical analysis and market behavior.
 
-    if bullish_signals > bearish_signals:
-        overall_signal = 'bullish'
-    elif bearish_signals > bullish_signals:
-        overall_signal = 'bearish'
-    else:
-        overall_signal = 'neutral'
+    Based on the comprehensive technical analysis of {len(prices)} price points, here are the key findings:
 
-    # Calculate confidence level based on the proportion of indicators agreeing
-    total_signals = len(signals)
-    confidence = max(bullish_signals, bearish_signals) / total_signals
+    PRICE ACTION ANALYSIS:
+    - Current Price: ${current_price:.2f}
+    - Trend Status: {get_trend_status(prices_df)}
+    - Volatility State: {get_volatility_state(prices_df)}
+    
+    INDICATOR SIGNALS:
+    1. Momentum (MACD):
+       {reasoning['MACD']['details']}
+       Interpretation: {get_macd_interpretation(macd_line, signal_line)}
 
-    # Generate the message content
-    message_content = {
-        "signal": overall_signal,
-        "confidence": f"{round(confidence * 100)}%",
-        "reasoning": {
-            "MACD": reasoning["MACD"],
-            "RSI": reasoning["RSI"],
-            "Bollinger": reasoning["Bollinger"],
-            "OBV": reasoning["OBV"]
-        }
-    }
+    2. Overbought/Oversold (RSI):
+       {reasoning['RSI']['details']}
+       Interpretation: {get_rsi_interpretation(rsi)}
 
-    # 1. Trend Following Strategy
-    trend_signals = calculate_trend_signals(prices_df)
+    3. Volatility (Bollinger Bands):
+       {reasoning['Bollinger']['details']}
+       Interpretation: {get_bollinger_interpretation(current_price, upper_band, lower_band)}
 
-    # 2. Mean Reversion Strategy
-    mean_reversion_signals = calculate_mean_reversion_signals(prices_df)
+    4. Volume Analysis (OBV):
+       {reasoning['OBV']['details']}
+       Interpretation: {get_obv_interpretation(obv_slope)}
 
-    # 3. Momentum Strategy
-    momentum_signals = calculate_momentum_signals(prices_df)
+    TECHNICAL CONFLUENCE:
+    - Bullish Signals: {signals.count('bullish')}
+    - Bearish Signals: {signals.count('bearish')}
+    - Neutral Signals: {signals.count('neutral')}
 
-    # 4. Volatility Strategy
-    volatility_signals = calculate_volatility_signals(prices_df)
+    SUPPORT/RESISTANCE LEVELS:
+    - Key Support: ${get_support_level(prices_df):.2f}
+    - Key Resistance: ${get_resistance_level(prices_df):.2f}
 
-    # 5. Statistical Arbitrage Signals
-    stat_arb_signals = calculate_stat_arb_signals(prices_df)
+    Please consider these technical factors in the context of:
+    1. Multiple timeframe confirmation
+    2. Volume validation
+    3. Momentum alignment
+    4. Volatility regime"""
 
-    # Combine all signals using a weighted ensemble approach
-    strategy_weights = {
-        'trend': 0.25,
-        'mean_reversion': 0.20,
-        'momentum': 0.25,
-        'volatility': 0.15,
-        'stat_arb': 0.15
-    }
-
-    combined_signal = weighted_signal_combination({
-        'trend': trend_signals,
-        'mean_reversion': mean_reversion_signals,
-        'momentum': momentum_signals,
-        'volatility': volatility_signals,
-        'stat_arb': stat_arb_signals
-    }, strategy_weights)
-
-    # Generate detailed analysis report
-    analysis_report = {
-        "signal": combined_signal['signal'],
-        "confidence": f"{round(combined_signal['confidence'] * 100)}%",
-        "strategy_signals": {
-            "trend_following": {
-                "signal": trend_signals['signal'],
-                "confidence": f"{round(trend_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(trend_signals['metrics'])
-            },
-            "mean_reversion": {
-                "signal": mean_reversion_signals['signal'],
-                "confidence": f"{round(mean_reversion_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(mean_reversion_signals['metrics'])
-            },
-            "momentum": {
-                "signal": momentum_signals['signal'],
-                "confidence": f"{round(momentum_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(momentum_signals['metrics'])
-            },
-            "volatility": {
-                "signal": volatility_signals['signal'],
-                "confidence": f"{round(volatility_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(volatility_signals['metrics'])
-            },
-            "statistical_arbitrage": {
-                "signal": stat_arb_signals['signal'],
-                "confidence": f"{round(stat_arb_signals['confidence'] * 100)}%",
-                "metrics": normalize_pandas(stat_arb_signals['metrics'])
-            }
-        }
-    }
-
-    # Create the technical analyst message
+    # Create the technical analyst message with enhanced expertise
     message = HumanMessage(
-        content=json.dumps(analysis_report),
+        content=json.dumps({
+            "signal": get_overall_signal(signals),
+            "confidence": f"{get_signal_confidence(signals) * 100:.0f}%",
+            "reasoning": {
+                "expert_analysis": expert_message,
+                "technical_signals": reasoning
+            }
+        }),
         name="technical_analyst_agent",
     )
 
     if show_reasoning:
-        show_agent_reasoning(analysis_report, "Technical Analyst")
+        show_agent_reasoning({
+            "signal": get_overall_signal(signals),
+            "confidence": f"{get_signal_confidence(signals) * 100:.0f}%",
+            "reasoning": {
+                "expert_analysis": expert_message,
+                "technical_signals": reasoning
+            }
+        }, "Technical Analyst")
 
     return {
         "messages": [message],
@@ -668,3 +632,128 @@ def calculate_obv(prices_df: pd.DataFrame) -> pd.Series:
             obv.append(obv[-1])
     prices_df['OBV'] = obv
     return prices_df['OBV']
+
+
+# Add helper functions at the top of the file
+def get_trend_status(df):
+    """Determine the current trend status using multiple moving averages"""
+    ma20 = df['close'].rolling(window=20).mean()
+    ma50 = df['close'].rolling(window=50).mean()
+    current_price = df['close'].iloc[-1]
+    
+    if current_price > ma20.iloc[-1] and ma20.iloc[-1] > ma50.iloc[-1]:
+        return "Strong Uptrend"
+    elif current_price > ma20.iloc[-1] and ma20.iloc[-1] < ma50.iloc[-1]:
+        return "Weak Uptrend"
+    elif current_price < ma20.iloc[-1] and ma20.iloc[-1] < ma50.iloc[-1]:
+        return "Strong Downtrend"
+    elif current_price < ma20.iloc[-1] and ma20.iloc[-1] > ma50.iloc[-1]:
+        return "Weak Downtrend"
+    return "Sideways"
+
+def get_volatility_state(df):
+    """Assess the current volatility state using ATR"""
+    atr = calculate_atr(df)
+    atr_ma = atr.rolling(window=20).mean()
+    current_atr = atr.iloc[-1]
+    
+    if current_atr > atr_ma.iloc[-1] * 1.5:
+        return "High Volatility"
+    elif current_atr < atr_ma.iloc[-1] * 0.5:
+        return "Low Volatility"
+    return "Normal Volatility"
+
+def get_macd_interpretation(macd_line, signal_line):
+    """Provide detailed MACD interpretation"""
+    if macd_line.iloc[-1] > signal_line.iloc[-1]:
+        if macd_line.iloc[-1] > 0:
+            return "Strong Bullish - MACD above signal line and zero line"
+        return "Weak Bullish - MACD above signal line but below zero line"
+    else:
+        if macd_line.iloc[-1] < 0:
+            return "Strong Bearish - MACD below signal line and zero line"
+        return "Weak Bearish - MACD below signal line but above zero line"
+
+def get_rsi_interpretation(rsi):
+    """Provide detailed RSI interpretation"""
+    current_rsi = rsi.iloc[-1]
+    if current_rsi < 30:
+        return "Oversold - Potential buying opportunity"
+    elif current_rsi > 70:
+        return "Overbought - Potential selling opportunity"
+    elif 40 <= current_rsi <= 60:
+        return "Neutral - No clear signal"
+    elif 30 <= current_rsi < 40:
+        return "Approaching oversold - Monitor for reversal"
+    else:  # 60 < current_rsi <= 70
+        return "Approaching overbought - Monitor for reversal"
+
+def get_bollinger_interpretation(price, upper, lower):
+    """Provide detailed Bollinger Bands interpretation"""
+    if price > upper.iloc[-1]:
+        return "Price above upper band - Potential overbought condition"
+    elif price < lower.iloc[-1]:
+        return "Price below lower band - Potential oversold condition"
+    else:
+        middle = (upper.iloc[-1] + lower.iloc[-1]) / 2
+        if price > middle:
+            return "Price in upper half of bands - Bullish bias"
+        return "Price in lower half of bands - Bearish bias"
+
+def get_obv_interpretation(slope):
+    """Provide detailed OBV interpretation"""
+    if slope > 0.5:
+        return "Strong buying pressure - Volume confirming uptrend"
+    elif slope > 0:
+        return "Moderate buying pressure - Volume mildly bullish"
+    elif slope < -0.5:
+        return "Strong selling pressure - Volume confirming downtrend"
+    elif slope < 0:
+        return "Moderate selling pressure - Volume mildly bearish"
+    return "Neutral volume pressure - No clear direction"
+
+def get_support_level(df):
+    """Calculate key support level using recent lows"""
+    return df['low'].tail(20).min()
+
+def get_resistance_level(df):
+    """Calculate key resistance level using recent highs"""
+    return df['high'].tail(20).max()
+
+def get_overall_signal(signals):
+    """Determine overall signal based on signal counts"""
+    bullish_count = signals.count('bullish')
+    bearish_count = signals.count('bearish')
+    
+    if bullish_count > bearish_count:
+        return 'bullish'
+    elif bearish_count > bullish_count:
+        return 'bearish'
+    return 'neutral'
+
+def get_signal_confidence(signals):
+    """Calculate confidence level based on signal agreement"""
+    total_signals = len(signals)
+    if total_signals == 0:
+        return 0
+    
+    bullish_count = signals.count('bullish')
+    bearish_count = signals.count('bearish')
+    max_count = max(bullish_count, bearish_count)
+    
+    return max_count / total_signals
+
+def calculate_atr(df, period=14):
+    """Calculate Average True Range"""
+    high = df['high']
+    low = df['low']
+    close = df['close']
+    
+    tr1 = high - low
+    tr2 = abs(high - close.shift())
+    tr3 = abs(low - close.shift())
+    
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    
+    return atr

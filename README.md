@@ -2,7 +2,30 @@
 
 A sophisticated AI-powered investment agent system for US stock market analysis and trading decisions, leveraging yfinance for market data and AlphaVantage for news sentiment analysis.
 
-🌏 English | [简体中文](README_zh.md)
+This is based on the original FREE_US_INVESTMENT_AGENT_SYSTEM project (https://github.com/24mlight/Free_US_Investment_Agent_System/blob/main/README.md) but with some improvements:
+
+## 🔄 Improvements
+
+### Enhanced Options Trading Support
+
+- Implemented comprehensive options strategy analysis and execution
+- Added support for both single-leg and spread strategies
+- Integrated options position tracking and valuation
+- Enhanced backtesting to include options performance metrics
+
+### Improved Portfolio Management
+
+- Enhanced price target extraction with two-pass system
+- Added DCF analysis fallback for valuation
+- Improved handling of buy/sell targets based on fair value
+- Enhanced JSON parsing and error handling for agent messages
+
+### UI/UX Improvements
+
+- Added more detailed reasoning in portfolio manager output
+- Enhanced error messages and validation
+- Improved formatting of trading recommendations
+- Added comprehensive options strategy implementation details
 
 ## 🛡️ Disclaimer
 

@@ -8,6 +8,7 @@ from agents.technicals import technical_analyst_agent
 from agents.portfolio_manager import portfolio_management_agent
 from agents.market_data import market_data_agent
 from agents.fundamentals import fundamentals_agent
+from agents.options_advisor import options_advisor_agent
 from langgraph.graph import END, StateGraph
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
@@ -49,6 +50,7 @@ workflow.add_node("sentiment_agent", sentiment_agent)
 workflow.add_node("risk_management_agent", risk_management_agent)
 workflow.add_node("portfolio_management_agent", portfolio_management_agent)
 workflow.add_node("valuation_agent", valuation_agent)
+workflow.add_node("options_advisor_agent", options_advisor_agent)
 
 # Define the workflow
 workflow.set_entry_point("market_data_agent")
@@ -56,10 +58,15 @@ workflow.add_edge("market_data_agent", "technical_analyst_agent")
 workflow.add_edge("market_data_agent", "fundamentals_agent")
 workflow.add_edge("market_data_agent", "sentiment_agent")
 workflow.add_edge("market_data_agent", "valuation_agent")
+workflow.add_edge("technical_analyst_agent", "options_advisor_agent")
+workflow.add_edge("fundamentals_agent", "options_advisor_agent")
+workflow.add_edge("sentiment_agent", "options_advisor_agent")
+workflow.add_edge("valuation_agent", "options_advisor_agent")
 workflow.add_edge("technical_analyst_agent", "risk_management_agent")
 workflow.add_edge("fundamentals_agent", "risk_management_agent")
 workflow.add_edge("sentiment_agent", "risk_management_agent")
 workflow.add_edge("valuation_agent", "risk_management_agent")
+workflow.add_edge("options_advisor_agent", "risk_management_agent")
 workflow.add_edge("risk_management_agent", "portfolio_management_agent")
 workflow.add_edge("portfolio_management_agent", END)
 

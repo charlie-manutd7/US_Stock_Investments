@@ -40,8 +40,13 @@ class Backtester:
         self.start_date = start_date
         self.end_date = end_date
         self.initial_capital = initial_capital
-        self.portfolio = {"cash": initial_capital, "stock": 0}
+        self.portfolio = {
+            "cash": initial_capital,
+            "stock": 0,
+            "options": []  # List to track options positions
+        }
         self.portfolio_values = []
+        self.options_trades = []  # Track options trades
         self.num_of_news = num_of_news
 
         # Setup logging
@@ -243,16 +248,133 @@ class Backtester:
             return 0
         return 0
 
+    def calculate_options_value(self, current_price, current_date):
+        """Calculate the value of options positions"""
+        total_value = 0
+        expired_positions = []
+        
+        for position in self.portfolio["options"]:
+            # Check if option has expired
+            expiry_date = datetime.strptime(position["expiry_date"], "%Y-%m-%d")
+            if datetime.strptime(current_date, "%Y-%m-%d") >= expiry_date:
+                # Calculate expiration value
+                if position["type"] == "call":
+                    value = max(0, current_price - position["strike"]) * 100 * position["contracts"]
+                else:  # put
+                    value = max(0, position["strike"] - current_price) * 100 * position["contracts"]
+                total_value += value
+                expired_positions.append(position)
+                self.portfolio["cash"] += value
+            else:
+                # Estimate current value using intrinsic value (simplified)
+                if position["type"] == "call":
+                    value = max(0, current_price - position["strike"]) * 100 * position["contracts"]
+                else:  # put
+                    value = max(0, position["strike"] - current_price) * 100 * position["contracts"]
+                total_value += value
+        
+        # Remove expired positions
+        for position in expired_positions:
+            self.portfolio["options"].remove(position)
+        
+        return total_value
+
+    def execute_options_trade(self, strategy, current_price, current_date):
+        """Execute options trade based on strategy recommendation"""
+        if not strategy or not isinstance(strategy, dict):
+            return 0
+            
+        try:
+            implementation = strategy.get("implementation", {})
+            if not implementation:
+                return 0
+                
+            cost = 0
+            trade_details = {
+                "date": current_date,
+                "strategy": strategy["strategy"],
+                "price": current_price
+            }
+            
+            if "buy_leg" in implementation and "sell_leg" in implementation:
+                # Spread strategy
+                buy_premium = implementation["premium"]["target_premium"]
+                contracts = min(5, int(self.portfolio["cash"] / (buy_premium * 100)))  # Max 5 contracts
+                if contracts > 0:
+                    expiry_days = int(implementation["buy_leg"]["recommended_expiration"].split()[0].split("-")[0])
+                    expiry_date = (datetime.strptime(current_date, "%Y-%m-%d") + timedelta(days=expiry_days)).strftime("%Y-%m-%d")
+                    
+                    # Add buy leg
+                    self.portfolio["options"].append({
+                        "type": implementation["buy_leg"]["type"],
+                        "strike": implementation["buy_leg"]["recommended_strike"],
+                        "contracts": contracts,
+                        "premium_paid": buy_premium * 100 * contracts,
+                        "expiry_date": expiry_date
+                    })
+                    
+                    # Add sell leg
+                    self.portfolio["options"].append({
+                        "type": implementation["sell_leg"]["type"],
+                        "strike": implementation["sell_leg"]["recommended_strike"],
+                        "contracts": -contracts,  # Negative for short position
+                        "premium_received": implementation["premium"]["target_premium"] * 100 * contracts,
+                        "expiry_date": expiry_date
+                    })
+                    
+                    cost = (buy_premium - implementation["premium"]["target_premium"]) * 100 * contracts
+                    self.portfolio["cash"] -= cost
+                    
+                    trade_details.update({
+                        "type": "spread",
+                        "contracts": contracts,
+                        "net_cost": cost,
+                        "expiry_date": expiry_date
+                    })
+                    
+            elif "strikes" in implementation:
+                # Single leg strategy
+                premium = implementation["premium"]["target_premium"]
+                contracts = min(5, int(self.portfolio["cash"] / (premium * 100)))  # Max 5 contracts
+                if contracts > 0:
+                    expiry_days = int(implementation["recommended_expiration"].split()[0].split("-")[0])
+                    expiry_date = (datetime.strptime(current_date, "%Y-%m-%d") + timedelta(days=expiry_days)).strftime("%Y-%m-%d")
+                    
+                    position_type = "call" if "call" in strategy["strategy"].lower() else "put"
+                    self.portfolio["options"].append({
+                        "type": position_type,
+                        "strike": implementation["recommended_strike"],
+                        "contracts": contracts,
+                        "premium_paid": premium * 100 * contracts,
+                        "expiry_date": expiry_date
+                    })
+                    
+                    cost = premium * 100 * contracts
+                    self.portfolio["cash"] -= cost
+                    
+                    trade_details.update({
+                        "type": "single",
+                        "contracts": contracts,
+                        "cost": cost,
+                        "expiry_date": expiry_date
+                    })
+            
+            if cost > 0:
+                self.options_trades.append(trade_details)
+            return cost
+            
+        except Exception as e:
+            self.backtest_logger.error(f"Error executing options trade: {str(e)}")
+            return 0
+
     def run_backtest(self):
         """Run backtest simulation"""
         # Get valid trading days from market calendar
-        schedule = self.nyse.schedule(
-            start_date=self.start_date, end_date=self.end_date)
-        dates = pd.DatetimeIndex([dt.strftime('%Y-%m-%d')
-                                 for dt in schedule.index])
+        schedule = self.nyse.schedule(start_date=self.start_date, end_date=self.end_date)
+        dates = pd.DatetimeIndex([dt.strftime('%Y-%m-%d') for dt in schedule.index])
 
         self.backtest_logger.info("\nStarting backtest...")
-        print(f"{'Date':<12} {'Code':<6} {'Action':<6} {'Quantity':>8} {'Price':>8} {'Cash':>12} {'Stock':>8} {'Total':>12} {'Bull':>8} {'Bear':>8} {'Neutral':>8}")
+        print(f"{'Date':<12} {'Code':<6} {'Action':<6} {'Qty':>8} {'Price':>8} {'Options':>12} {'Cash':>12} {'Total':>12} {'Return':>8}")
         print("-" * 110)
 
         for current_date in dates:
@@ -260,128 +382,61 @@ class Backtester:
 
             # Check if market is open
             if not self.is_market_open(current_date_str):
-                self.backtest_logger.info(
-                    f"Market is closed on {current_date_str} (Holiday), skipping...")
                 continue
 
             # Get previous trading day
             decision_date = self.get_previous_trading_day(current_date_str)
             if decision_date is None:
-                self.backtest_logger.warning(
-                    f"Could not find previous trading day for {current_date_str}, skipping...")
                 continue
 
             # Use 365-day lookback window
-            lookback_start = (pd.Timestamp(current_date_str) -
-                              pd.Timedelta(days=365)).strftime("%Y-%m-%d")
+            lookback_start = (pd.Timestamp(current_date_str) - pd.Timedelta(days=365)).strftime("%Y-%m-%d")
 
-            self.backtest_logger.info(
-                f"\nProcessing trading day: {current_date_str}")
-            self.backtest_logger.info(
-                f"Using data up to: {decision_date} (previous trading day)")
-            self.backtest_logger.info(
-                f"Historical data range: {lookback_start} to {decision_date}")
-
-            # Get current day's price data for trade execution
             try:
-                df = get_price_data(
-                    self.ticker, current_date_str, current_date_str)
+                df = get_price_data(self.ticker, current_date_str, current_date_str)
                 if df is None or df.empty:
-                    self.backtest_logger.warning(
-                        f"No price data available for {current_date_str}, skipping...")
                     continue
 
-                # Use opening price for trade execution
                 current_price = df.iloc[0]['open']
             except Exception as e:
-                self.backtest_logger.error(
-                    f"Error getting price data for {current_date_str}: {str(e)}")
+                self.backtest_logger.error(f"Error getting price data: {str(e)}")
                 continue
 
-            # Get agent decision based on historical data
-            output = self.get_agent_decision(
-                decision_date,
-                lookback_start,
-                self.portfolio,
-                self.num_of_news
-            )
-
-            self.backtest_logger.info(f"\nTrade Date: {current_date_str}")
-            self.backtest_logger.info(
-                f"Decision based on data up to: {decision_date}")
-
-            if "analyst_signals" in output:
-                self.backtest_logger.info("\nAgent Analysis Results:")
-                for agent_name, signal in output["analyst_signals"].items():
-                    self.backtest_logger.info(f"\n{agent_name}:")
-
-                    signal_str = f"- Signal: {signal.get('signal', 'unknown')}"
-                    if 'confidence' in signal:
-                        signal_str += f", Confidence: {signal.get('confidence', 0)*100:.0f}%"
-                    self.backtest_logger.info(signal_str)
-
-                    if 'analysis' in signal:
-                        self.backtest_logger.info("- Analysis:")
-                        analysis = signal['analysis']
-                        if isinstance(analysis, dict):
-                            for key, value in analysis.items():
-                                self.backtest_logger.info(f"  {key}: {value}")
-                        elif isinstance(analysis, list):
-                            for item in analysis:
-                                self.backtest_logger.info(f"  • {item}")
-                        else:
-                            self.backtest_logger.info(f"  {analysis}")
-
-                    if 'reason' in signal:
-                        self.backtest_logger.info("- Decision Rationale:")
-                        reason = signal['reason']
-                        if isinstance(reason, list):
-                            for item in reason:
-                                self.backtest_logger.info(f"  • {item}")
-                        else:
-                            self.backtest_logger.info(f"  • {reason}")
-
-            agent_decision = output.get(
-                "decision", {"action": "hold", "quantity": 0})
-            action, quantity = agent_decision.get(
-                "action", "hold"), agent_decision.get("quantity", 0)
-
-            self.backtest_logger.info("\nFinal Decision:")
-            self.backtest_logger.info(f"Action: {action.upper()}")
-            self.backtest_logger.info(f"Quantity: {quantity}")
-            if "reason" in agent_decision:
-                self.backtest_logger.info(
-                    f"Reason: {agent_decision['reason']}")
-
-            # Execute trade
-            executed_quantity = self.execute_trade(
-                action, quantity, current_price)
-
-            # Update portfolio value
-            total_value = self.portfolio["cash"] + \
-                self.portfolio["stock"] * current_price
-            self.portfolio["portfolio_value"] = total_value
-
+            # Get agent decision
+            output = self.get_agent_decision(decision_date, lookback_start, self.portfolio, self.num_of_news)
+            
+            # Execute stock trades
+            agent_decision = output.get("decision", {"action": "hold", "quantity": 0})
+            action, quantity = agent_decision.get("action", "hold"), agent_decision.get("quantity", 0)
+            executed_quantity = self.execute_trade(action, quantity, current_price)
+            
+            # Execute options trades if recommended
+            options_strategy = agent_decision.get("options_strategy")
+            if isinstance(options_strategy, dict) and options_strategy.get("strategy") != "No strategy recommended":
+                options_cost = self.execute_options_trade(options_strategy, current_price, current_date_str)
+            else:
+                options_cost = 0
+            
+            # Calculate portfolio value including options
+            options_value = self.calculate_options_value(current_price, current_date_str)
+            stock_value = self.portfolio["stock"] * current_price
+            total_value = self.portfolio["cash"] + stock_value + options_value
+            
             # Record portfolio value
             self.portfolio_values.append({
                 "Date": current_date_str,
                 "Portfolio Value": total_value,
+                "Stock Value": stock_value,
+                "Options Value": options_value,
+                "Cash": self.portfolio["cash"],
                 "Daily Return": (total_value / self.portfolio_values[-1]["Portfolio Value"] - 1) * 100 if self.portfolio_values else 0
             })
-
-            # Count signals
-            bull_count = sum(1 for signal in output.get(
-                "analyst_signals", {}).values() if signal.get("signal") == "buy")
-            bear_count = sum(1 for signal in output.get(
-                "analyst_signals", {}).values() if signal.get("signal") == "sell")
-            neutral_count = sum(1 for signal in output.get(
-                "analyst_signals", {}).values() if signal.get("signal") == "hold")
 
             # Print trade record
             print(
                 f"{current_date_str:<12} {self.ticker:<6} {action:<6} {executed_quantity:>8} "
-                f"{current_price:>8.2f} {self.portfolio['cash']:>12.2f} {self.portfolio['stock']:>8} "
-                f"{total_value:>12.2f} {bull_count:>8} {bear_count:>8} {neutral_count:>8}"
+                f"{current_price:>8.2f} {options_value:>12.2f} {self.portfolio['cash']:>12.2f} "
+                f"{total_value:>12.2f} {self.portfolio_values[-1]['Daily Return']:>8.2f}%"
             )
 
         # Analyze backtest results
@@ -390,97 +445,74 @@ class Backtester:
     def analyze_performance(self):
         """Analyze backtest performance"""
         if not self.portfolio_values:
-            self.backtest_logger.warning("No portfolio values to analyze")
             return
 
         try:
             performance_df = pd.DataFrame(self.portfolio_values)
-            # 将日期字符串转换为datetime类型
             performance_df['Date'] = pd.to_datetime(performance_df['Date'])
             performance_df = performance_df.set_index('Date')
 
-            # 计算累计收益率
-            performance_df["Cumulative Return"] = (
-                performance_df["Portfolio Value"] / self.initial_capital - 1) * 100
-            performance_df["Portfolio Value (K)"] = performance_df["Portfolio Value"] / 1000
+            # Calculate returns
+            performance_df["Cumulative Return"] = (performance_df["Portfolio Value"] / self.initial_capital - 1) * 100
+            performance_df["Stock Return"] = (performance_df["Stock Value"] / self.initial_capital) * 100
+            performance_df["Options Return"] = (performance_df["Options Value"] / self.initial_capital) * 100
 
-            # 创建子图
-            fig, (ax1, ax2) = plt.subplots(
-                2, 1, figsize=(12, 10), height_ratios=[1, 1])
+            # Create visualization
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))
             fig.suptitle("Backtest Analysis", fontsize=12)
 
-            # 绘制投资组合价值
-            line1 = ax1.plot(performance_df.index, performance_df["Portfolio Value (K)"],
-                             label="Portfolio Value", marker='o')
-            ax1.set_ylabel("Portfolio Value (K)")
-            ax1.set_title("Portfolio Value Change")
+            # Plot portfolio value
+            ax1.plot(performance_df.index, performance_df["Portfolio Value"], label="Total Value", color='blue')
+            ax1.plot(performance_df.index, performance_df["Stock Value"], label="Stock Value", color='green')
+            ax1.plot(performance_df.index, performance_df["Options Value"], label="Options Value", color='red')
+            ax1.set_ylabel("Value ($)")
+            ax1.set_title("Portfolio Components")
+            ax1.legend()
 
-            # 添加数据标注
-            for x, y in zip(performance_df.index, performance_df["Portfolio Value (K)"]):
-                ax1.annotate(f'{y:.1f}K',
-                             (x, y),
-                             textcoords="offset points",
-                             xytext=(0, 10),
-                             ha='center')
+            # Plot cumulative returns
+            ax2.plot(performance_df.index, performance_df["Cumulative Return"], label="Total Return", color='blue')
+            ax2.plot(performance_df.index, performance_df["Stock Return"], label="Stock Return", color='green')
+            ax2.plot(performance_df.index, performance_df["Options Return"], label="Options Return", color='red')
+            ax2.set_ylabel("Return (%)")
+            ax2.set_title("Component Returns")
+            ax2.legend()
 
-            # 绘制累计收益率
-            line2 = ax2.plot(performance_df.index, performance_df["Cumulative Return"],
-                             label="Cumulative Return", color='green', marker='o')
-            ax2.set_ylabel("Cumulative Return (%)")
-            ax2.set_title("Cumulative Return Change")
+            # Plot options trades
+            if self.options_trades:
+                trade_dates = [trade["date"] for trade in self.options_trades]
+                trade_costs = [trade.get("net_cost", trade.get("cost", 0)) for trade in self.options_trades]
+                ax3.bar(trade_dates, trade_costs, color='purple')
+                ax3.set_ylabel("Trade Cost ($)")
+                ax3.set_title("Options Trades")
+                plt.xticks(rotation=45)
 
-            # 添加数据标注
-            for x, y in zip(performance_df.index, performance_df["Cumulative Return"]):
-                ax2.annotate(f'{y:.1f}%',
-                             (x, y),
-                             textcoords="offset points",
-                             xytext=(0, 10),
-                             ha='center')
-
-            plt.xlabel("Date")
             plt.tight_layout()
-
-            # 保存图片
             plt.savefig("backtest_results.png", bbox_inches='tight', dpi=300)
-            # 显示图片
-            plt.show(block=True)
-            # 关闭图形
-            plt.close('all')
+            plt.close()
 
-            # 计算性能指标
-            total_return = (
-                self.portfolio["portfolio_value"] - self.initial_capital) / self.initial_capital
-
-            # 输出回测总结
-            self.backtest_logger.info("\n" + "=" * 50)
-            self.backtest_logger.info("Backtest Summary")
+            # Print summary
+            self.backtest_logger.info("\nBacktest Summary")
             self.backtest_logger.info("=" * 50)
-            self.backtest_logger.info(
-                f"Initial Capital: {self.initial_capital:,.2f}")
-            self.backtest_logger.info(
-                f"Final Value: {self.portfolio['portfolio_value']:,.2f}")
-            self.backtest_logger.info(
-                f"Total Return: {total_return * 100:.2f}%")
-
-            # 计算夏普比率
-            daily_returns = performance_df["Daily Return"] / 100
-            mean_daily_return = daily_returns.mean()
-            std_daily_return = daily_returns.std()
-            sharpe_ratio = (mean_daily_return / std_daily_return) * \
-                (252 ** 0.5) if std_daily_return != 0 else 0
-            self.backtest_logger.info(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-
-            # 计算最大回撤
-            rolling_max = performance_df["Portfolio Value"].cummax()
-            drawdown = (
-                performance_df["Portfolio Value"] / rolling_max - 1) * 100
-            max_drawdown = drawdown.min()
-            self.backtest_logger.info(f"Maximum Drawdown: {max_drawdown:.2f}%")
+            self.backtest_logger.info(f"Initial Capital: ${self.initial_capital:,.2f}")
+            self.backtest_logger.info(f"Final Portfolio Value: ${performance_df['Portfolio Value'].iloc[-1]:,.2f}")
+            self.backtest_logger.info(f"Final Stock Value: ${performance_df['Stock Value'].iloc[-1]:,.2f}")
+            self.backtest_logger.info(f"Final Options Value: ${performance_df['Options Value'].iloc[-1]:,.2f}")
+            self.backtest_logger.info(f"Total Return: {performance_df['Cumulative Return'].iloc[-1]:.2f}%")
+            
+            # Options trading summary
+            if self.options_trades:
+                self.backtest_logger.info("\nOptions Trading Summary")
+                self.backtest_logger.info("-" * 50)
+                for trade in self.options_trades:
+                    self.backtest_logger.info(f"Date: {trade['date']}")
+                    self.backtest_logger.info(f"Strategy: {trade['strategy']}")
+                    self.backtest_logger.info(f"Contracts: {trade['contracts']}")
+                    self.backtest_logger.info(f"Cost: ${trade.get('net_cost', trade.get('cost', 0)):,.2f}")
+                    self.backtest_logger.info("-" * 25)
 
             return performance_df
         except Exception as e:
-            self.backtest_logger.error(
-                f"Error in performance analysis: {str(e)}")
+            self.backtest_logger.error(f"Error in performance analysis: {str(e)}")
             return None
 
 

@@ -4,12 +4,104 @@ from agents.state import AgentState, show_agent_reasoning
 
 import json
 
+# Add helper functions at the top of the file
+def get_profitability_assessment(score):
+    """Provide detailed profitability assessment"""
+    if score >= 2:
+        return "Strong profitability metrics indicating efficient operations and good management"
+    elif score == 1:
+        return "Mixed profitability metrics suggesting room for operational improvement"
+    return "Weak profitability metrics indicating potential business model issues"
+
+def get_growth_assessment(score):
+    """Provide detailed growth assessment"""
+    if score >= 2:
+        return "Strong growth across key metrics indicating business expansion"
+    elif score == 1:
+        return "Moderate growth with some areas showing promise"
+    return "Limited growth suggesting potential market saturation or competitive pressures"
+
+def get_financial_health_assessment(score):
+    """Provide detailed financial health assessment"""
+    if score >= 2:
+        return "Strong balance sheet with good liquidity and conservative leverage"
+    elif score == 1:
+        return "Adequate financial position but room for improvement"
+    return "Potential financial stress requiring careful monitoring"
+
+def get_fcf_conversion_rate(fcf_per_share, eps):
+    """Assess free cash flow conversion quality"""
+    if not fcf_per_share or not eps or eps == 0:
+        return "Unable to assess - insufficient data"
+    
+    conversion_rate = fcf_per_share / eps
+    if conversion_rate > 1.2:
+        return "Excellent FCF conversion - earnings quality is high"
+    elif conversion_rate > 0.8:
+        return "Good FCF conversion - earnings appear sustainable"
+    elif conversion_rate > 0.5:
+        return "Moderate FCF conversion - monitor working capital"
+    return "Poor FCF conversion - potential earnings quality issues"
+
+def get_capital_allocation_assessment(metrics):
+    """Assess management's capital allocation decisions"""
+    roe = metrics.get("return_on_equity", 0)
+    roic = metrics.get("return_on_invested_capital", 0)
+    payout_ratio = metrics.get("payout_ratio", 0)
+    
+    if roe > 0.15 and roic > 0.12:
+        if payout_ratio < 0.75:
+            return "Excellent capital allocation - high returns and sustainable payout"
+        return "Good capital allocation but high payout ratio"
+    elif roe > 0.10 and roic > 0.08:
+        return "Adequate capital allocation - returns above cost of capital"
+    return "Poor capital allocation - returns suggest value destruction"
+
+def get_business_model_assessment(metrics):
+    """Assess the quality and sustainability of the business model"""
+    gross_margin = metrics.get("gross_margin", 0)
+    operating_margin = metrics.get("operating_margin", 0)
+    asset_turnover = metrics.get("asset_turnover", 0)
+    
+    if gross_margin > 0.40 and operating_margin > 0.20:
+        return "Strong business model with pricing power"
+    elif gross_margin > 0.30 and operating_margin > 0.10:
+        return "Solid business model with good economics"
+    elif gross_margin > 0.20 and operating_margin > 0.05:
+        return "Average business model - limited competitive advantage"
+    return "Challenging business model - may lack differentiation"
+
+def get_overall_signal(signals):
+    """Determine overall signal based on signal counts"""
+    bullish_count = signals.count('bullish')
+    bearish_count = signals.count('bearish')
+    
+    if bullish_count > bearish_count:
+        return 'bullish'
+    elif bearish_count > bullish_count:
+        return 'bearish'
+    return 'neutral'
+
+def get_signal_confidence(signals):
+    """Calculate confidence level based on signal agreement"""
+    total_signals = len(signals)
+    if total_signals == 0:
+        return 0
+    
+    bullish_count = signals.count('bullish')
+    bearish_count = signals.count('bearish')
+    max_count = max(bullish_count, bearish_count)
+    
+    return max_count / total_signals
+
 ##### Fundamental Agent #####
 def fundamentals_agent(state: AgentState):
     """Analyzes fundamental data and generates trading signals."""
     show_reasoning = state["metadata"]["show_reasoning"]
     data = state["data"]
     metrics = data["financial_metrics"][0]
+    current_financial_line_item = data["financial_line_items"][0]
+    previous_financial_line_item = data["financial_line_items"][1]
 
     # Initialize signals list for different fundamental aspects
     signals = []
@@ -134,22 +226,68 @@ def fundamentals_agent(state: AgentState):
     total_signals = len(signals)
     confidence = max(bullish_signals, bearish_signals) / total_signals
     
-    message_content = {
-        "signal": overall_signal,
-        "confidence": f"{round(confidence * 100)}%",
-        "reasoning": reasoning
-    }
-    
-    # Create the fundamental analysis message
+    # Create expert system message
+    expert_message = f"""You are Warren Buffett, legendary value investor and CEO of Berkshire Hathaway, known for your focus on fundamental analysis and long-term value creation.
+
+    Based on the comprehensive fundamental analysis, here are the key findings:
+
+    PROFITABILITY ANALYSIS:
+    - Return on Equity: {metrics.get('return_on_equity', 'N/A'):.2%} if metrics.get('return_on_equity') else 'N/A'
+    - Net Margin: {metrics.get('net_margin', 'N/A'):.2%} if metrics.get('net_margin') else 'N/A'
+    - Operating Margin: {metrics.get('operating_margin', 'N/A'):.2%} if metrics.get('operating_margin') else 'N/A'
+    Assessment: {get_profitability_assessment(profitability_score)}
+
+    GROWTH METRICS:
+    - Revenue Growth: {metrics.get('revenue_growth', 'N/A'):.2%} if metrics.get('revenue_growth') else 'N/A'
+    - Earnings Growth: {metrics.get('earnings_growth', 'N/A'):.2%} if metrics.get('earnings_growth') else 'N/A'
+    - Book Value Growth: {metrics.get('book_value_growth', 'N/A'):.2%} if metrics.get('book_value_growth') else 'N/A'
+    Assessment: {get_growth_assessment(growth_score)}
+
+    FINANCIAL HEALTH:
+    - Current Ratio: {metrics.get('current_ratio', 'N/A'):.2f} if metrics.get('current_ratio') else 'N/A'
+    - Debt to Equity: {metrics.get('debt_to_equity', 'N/A'):.2f} if metrics.get('debt_to_equity') else 'N/A'
+    - FCF/Share: ${metrics.get('free_cash_flow_per_share', 'N/A'):.2f} if metrics.get('free_cash_flow_per_share') else 'N/A'
+    Assessment: {get_financial_health_assessment(health_score)}
+
+    QUALITY METRICS:
+    - FCF Conversion: {get_fcf_conversion_rate(free_cash_flow_per_share, earnings_per_share)}
+    - Capital Allocation: {get_capital_allocation_assessment(metrics)}
+    - Business Model: {get_business_model_assessment(metrics)}
+
+    FUNDAMENTAL CONFLUENCE:
+    - Bullish Signals: {signals.count('bullish')}
+    - Bearish Signals: {signals.count('bearish')}
+    - Neutral Signals: {signals.count('neutral')}
+
+    Please consider these fundamental factors in the context of:
+    1. Competitive advantage (moat)
+    2. Management quality
+    3. Capital allocation
+    4. Business predictability"""
+
+    # Create the fundamentals message with enhanced expertise
     message = HumanMessage(
-        content=json.dumps(message_content),
+        content=json.dumps({
+            "signal": get_overall_signal(signals),
+            "confidence": f"{get_signal_confidence(signals) * 100:.0f}%",
+            "reasoning": {
+                "expert_analysis": expert_message,
+                "fundamental_signals": reasoning
+            }
+        }),
         name="fundamentals_agent",
     )
-    
-    # Print the reasoning if the flag is set
+
     if show_reasoning:
-        show_agent_reasoning(message_content, "Fundamental Analysis Agent")
-    
+        show_agent_reasoning({
+            "signal": get_overall_signal(signals),
+            "confidence": f"{get_signal_confidence(signals) * 100:.0f}%",
+            "reasoning": {
+                "expert_analysis": expert_message,
+                "fundamental_signals": reasoning
+            }
+        }, "Fundamentals Analysis Agent")
+
     return {
         "messages": [message],
         "data": data,
