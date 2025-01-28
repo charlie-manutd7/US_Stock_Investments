@@ -342,15 +342,11 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
-This project is modified from [ai-hedge-fund](https://github.com/virattt/ai-hedge-fund.git). We sincerely thank the original authors for their excellent work and inspiration.
+This project is modified from [ai-hedge-fund](https://github.com/virattt/ai-hedge-fund.git) and FREE_US_INVESTMENT_AGENT_SYSTEM project (https://github.com/24mlight/Free_US_Investment_Agent_System/blob/main/README.md).
+
+We sincerely thank the original authors for their excellent work and inspiration.
 
 Additional acknowledgments:
 
 - [yfinance](https://github.com/ranaroussi/yfinance) for market data
 - [AlphaVantage](https://www.alphavantage.co/) for news and sentiment analysis
-
-## ☕ Support the Project
-
-If you find this project helpful, consider buying me a coffee!
-
-![Buy Me a Coffee](src/img/ali.png)
