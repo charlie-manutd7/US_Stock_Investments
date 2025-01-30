@@ -50,4 +50,15 @@ htmlcov/
 *.json
 data/
 !requirements.txt
-!.env.example 
+!.env.example
+
+# Node modules
+node_modules/
+
+# Distribution
+dist/
+build/
+
+# Local development
+*.sqlite3
+*.db
