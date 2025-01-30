@@ -8,11 +8,9 @@ import werkzeug
 import re
 from flask_cors import CORS
 
-# Add the parent directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from main import run_hedge_fund
-from backtester import Backtester
+# Import from the same directory
+from .main import run_hedge_fund
+from .backtester import Backtester
 
 # Get absolute paths for static and template folders
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
