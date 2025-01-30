@@ -1,3 +1,12 @@
+import os
+import sys
+
+# Add the agents directory to the Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+agents_dir = os.path.join(current_dir, 'agents')
+if agents_dir not in sys.path:
+    sys.path.append(agents_dir)
+
 from datetime import datetime, timedelta
 import argparse
 from agents.valuation import valuation_agent

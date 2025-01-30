@@ -3,7 +3,7 @@ services:
     name: stock-options-tool-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: cd src && gunicorn app:app
+    startCommand: gunicorn --chdir src app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -12,4 +12,4 @@ services:
       - key: PORT
         value: 8080
       - key: PYTHONPATH
-        value: .
+        value: src
