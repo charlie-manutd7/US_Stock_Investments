@@ -10,11 +10,12 @@ from flask_cors import CORS
 
 # Add src directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-from main import run_hedge_fund
-from backtester import Backtester
+from .main import run_hedge_fund
+from .backtester import Backtester
 
 # Get absolute paths for static and template folders
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

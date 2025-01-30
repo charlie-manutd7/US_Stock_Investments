@@ -5,7 +5,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import argparse
 import requests
-from src.tools.news_crawler import get_stock_news
+from tools.news_crawler import get_stock_news
 import logging
 
 # 设置日志记录

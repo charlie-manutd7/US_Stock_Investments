@@ -10,8 +10,8 @@ import matplotlib
 import pandas_market_calendars as mcal
 import warnings
 
-from main import run_hedge_fund
-from tools.api import get_price_data
+from .main import run_hedge_fund
+from .tools.api import get_price_data
 
 # Configure Chinese font based on OS
 if sys.platform.startswith('win'):
