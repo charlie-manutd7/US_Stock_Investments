@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
-from tools.openrouter_config import get_chat_completion, logger as api_logger
+from .openrouter_config import get_chat_completion, logger as api_logger
 import logging
 import time
 import pandas as pd

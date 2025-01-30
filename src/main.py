@@ -2,15 +2,15 @@ import os
 import sys
 from datetime import datetime, timedelta
 import argparse
-from agents.valuation import valuation_agent
-from agents.state import AgentState
-from agents.sentiment import sentiment_agent
-from agents.risk_manager import risk_management_agent
-from agents.technicals import technical_analyst_agent
-from agents.portfolio_manager import portfolio_management_agent
-from agents.market_data import market_data_agent
-from agents.fundamentals import fundamentals_agent
-from agents.options_advisor import options_advisor_agent
+from .agents.valuation import valuation_agent
+from .agents.state import AgentState
+from .agents.sentiment import sentiment_agent
+from .agents.risk_manager import risk_management_agent
+from .agents.technicals import technical_analyst_agent
+from .agents.portfolio_manager import portfolio_management_agent
+from .agents.market_data import market_data_agent
+from .agents.fundamentals import fundamentals_agent
+from .agents.options_advisor import options_advisor_agent
 from langgraph.graph import END, StateGraph
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
