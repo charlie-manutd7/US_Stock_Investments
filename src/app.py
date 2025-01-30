@@ -33,12 +33,11 @@ CORS(app, resources={
         "origins": [
             "http://localhost:5000",
             "http://localhost:8080",
-            "https://stock-options-tool.web.app",
-            "https://stock-options-tool.firebaseapp.com",
-            "https://stock-options-tool-api.onrender.com"
+            "https://us-stock-investments.web.app",
+            "https://us-stock-investments.firebaseapp.com"
         ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 

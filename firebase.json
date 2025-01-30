@@ -4,13 +4,30 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/venv/**",
+      "**/__pycache__/**"
     ],
     "rewrites": [
+      {
+        "source": "/api/**",
+        "destination": "https://stock-options-tool-api.onrender.com/api/:1"
+      },
       {
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
     ]
   }
-} 
+}

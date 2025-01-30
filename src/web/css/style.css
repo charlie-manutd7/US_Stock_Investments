@@ -1,0 +1,129 @@
+.chat-messages {
+    height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.message {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.user-message {
+    background-color: #e9ecef;
+    margin-left: 20%;
+}
+
+.system-message {
+    background-color: #f8f9fa;
+    margin-right: 20%;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.analysis-section {
+    margin-bottom: 1.5rem;
+}
+
+.analysis-section h6 {
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.metric {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.metric-label {
+    color: #6c757d;
+}
+
+.metric-value {
+    font-weight: 500;
+}
+
+.strategy-details {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-top: 1rem;
+}
+
+.loading {
+    position: relative;
+    min-height: 200px;
+}
+
+.loading::after {
+    content: "Loading...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #6c757d;
+}
+
+.error-message {
+    color: #dc3545;
+    padding: 0.5rem;
+    border: 1px solid #dc3545;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.success-message {
+    color: #198754;
+    padding: 0.5rem;
+    border: 1px solid #198754;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.reasoning-box {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.reasoning-box ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+.reasoning-box li {
+    margin-bottom: 5px;
+}
+
+.momentum-indicator {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.momentum-positive {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.momentum-negative {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.momentum-neutral {
+    background-color: #fff3cd;
+    color: #856404;
+} 

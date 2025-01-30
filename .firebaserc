@@ -1,1 +1,5 @@
-{"projects": {"default": "stock-options-tool"}}
+{
+  "projects": {
+    "default": "stock-options-tool"
+  }
+}
