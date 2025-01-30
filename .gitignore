@@ -37,6 +37,14 @@ ENV/
 *.swp
 *.swo
 
+# Logs
+*.log
+
+# Firebase
+service-account.json
+.firebase/
+firebase-debug.log
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,12 +1,46 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, abort
+import os
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from datetime import datetime, timedelta
 import sys
-import os
 import json
 import logging
 import werkzeug
 import re
 from flask_cors import CORS
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from main import run_hedge_fund
+from backtester import Backtester
+
+# Get absolute paths for static and template folders
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+static_folder = os.path.join(root_dir, 'src', 'web', 'static')
+template_folder = os.path.join(root_dir, 'src', 'web', 'templates')
+
+app = Flask(__name__, 
+    static_folder=static_folder,
+    template_folder=template_folder
+)
+
+# Enable CORS for all routes with proper configuration
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5000",
+            "http://localhost:8080",
+            "https://stock-options-tool.web.app",
+            "https://stock-options-tool.firebaseapp.com",
+            "https://stock-options-tool-api.onrender.com"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+
+# Configure basic logging
+app.logger.setLevel(logging.INFO)
 
 # Configure logging to ignore swarm requests completely
 werkzeug_logger = logging.getLogger('werkzeug')
@@ -36,28 +70,6 @@ def custom_info(msg, *args, **kwargs):
 werkzeug_logger.log = custom_log
 werkzeug_logger.warning = custom_warning
 werkzeug_logger.info = custom_info
-
-# Add the parent directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from main import run_hedge_fund
-from backtester import Backtester
-
-# Get absolute paths for static and template folders
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-static_folder = os.path.join(root_dir, 'src', 'web', 'static')
-template_folder = os.path.join(root_dir, 'src', 'web', 'templates')
-
-app = Flask(__name__, 
-    static_folder=static_folder,
-    template_folder=template_folder
-)
-
-# Enable CORS for all routes
-CORS(app)
-
-# Configure basic logging
-app.logger.setLevel(logging.INFO)
 
 @app.route('/')
 def index():
@@ -383,13 +395,14 @@ def analyze():
             'current_analysis': None
         }), 500
 
-if __name__ == '__main__':
-    # Ensure the static folder exists
-    os.makedirs(static_folder, exist_ok=True)
+if __name__ == "__main__":
+    # Get port from environment variable or use default
+    port = int(os.environ.get('PORT', 8080))
     
-    # Print debug information
-    app.logger.info(f"Static folder: {static_folder}")
-    app.logger.info(f"Template folder: {template_folder}")
+    # In production, listen on all interfaces
+    host = '0.0.0.0' if os.environ.get('PRODUCTION') else 'localhost'
     
-    # Use custom request handler
-    app.run(debug=True, port=5001) 
+    # Debug mode only in development
+    debug = not os.environ.get('PRODUCTION')
+    
+    app.run(host=host, port=port, debug=debug) 

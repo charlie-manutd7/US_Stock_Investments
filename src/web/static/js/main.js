@@ -2,6 +2,13 @@ let currentContext = {};
 // Removing backtest chart variable
 // let backtestChart = null;
 
+// Configuration
+const config = {
+  // Use production URL if available, otherwise fallback to localhost
+  apiBaseUrl:
+    "https://stock-options-tool-api.onrender.com" || "http://localhost:8080",
+};
+
 document.addEventListener("DOMContentLoaded", function () {
   // Set default date to today
   document.getElementById("endDate").valueAsDate = new Date();
@@ -15,14 +22,18 @@ document.addEventListener("DOMContentLoaded", function () {
 async function handleAnalysisSubmit(event) {
   event.preventDefault();
 
+  // Show loading state
+  document.getElementById("loadingSpinner").style.display = "block";
+  document.getElementById("analysisResults").style.display = "none";
+  document.getElementById("errorMessage").style.display = "none";
+
+  // Get form data
   const ticker = document.getElementById("ticker").value.toUpperCase();
   const endDate = document.getElementById("endDate").value;
   const numNews = document.getElementById("numNews").value;
 
-  showLoading();
-
   try {
-    const response = await fetch("/analyze", {
+    const response = await fetch(`${config.apiBaseUrl}/analyze`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -30,7 +41,7 @@ async function handleAnalysisSubmit(event) {
       body: JSON.stringify({
         ticker: ticker,
         end_date: endDate,
-        num_of_news: numNews,
+        num_of_news: parseInt(numNews),
       }),
     });
 
