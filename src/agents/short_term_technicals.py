@@ -2,8 +2,8 @@ from langchain_core.messages import HumanMessage
 import json
 import pandas as pd
 import numpy as np
-from agents.state import AgentState, show_agent_reasoning
-from tools.api import prices_to_df
+from .state import AgentState, show_agent_reasoning
+from ..tools.api import prices_to_df
 
 def short_term_technical_analyst_agent(state: AgentState):
     """
